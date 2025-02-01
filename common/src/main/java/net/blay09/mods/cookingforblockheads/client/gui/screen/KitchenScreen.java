@@ -13,21 +13,17 @@ import net.blay09.mods.cookingforblockheads.menu.slot.CraftableListingFakeSlot;
 import net.blay09.mods.cookingforblockheads.registry.CookingForBlockheadsRegistry;
 import net.blay09.mods.cookingforblockheads.tag.ModItemTags;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.MultiLineTextWidget;
-import net.minecraft.client.gui.components.StringWidget;
+import net.minecraft.client.gui.components.FittingMultiLineTextWidget;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeType;
-import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,8 +31,11 @@ import java.util.List;
 public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
 
     private static final int SCROLLBAR_COLOR = 0xFFAAAAAA;
-    private static final int SCROLLBAR_Y = 8;
-    private static final int SCROLLBAR_WIDTH = 7;
+    private static final int SCROLLBAR_X1 = 160;
+    private static final int SCROLLBAR_X2 = SCROLLBAR_X1 + 7;
+    private static final int SCROLLBAR_Y1 = 18;
+    private static final int SCROLLBAR_Y_SIZE = 77;
+
     private static final int SCROLLBAR_HEIGHT = 77;
 
     private static final ResourceLocation guiTexture = ResourceLocation.fromNamespaceAndPath(CookingForBlockheads.MOD_ID, "textures/gui/gui.png");
@@ -51,7 +50,6 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
     private static final org.slf4j.Logger LOGGER = LogUtils.getLogger();
 
     private int scrollBarScaledHeight;
-    private int scrollBarXPos;
     private int scrollBarYPos;
     private int currentOffset;
 
@@ -61,8 +59,8 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
 
     private Button btnNextRecipe;
     private Button btnPrevRecipe;
-    private MultiLineTextWidget textNoIngredients;
-    private MultiLineTextWidget textNoSelection;
+    private FittingMultiLineTextWidget textNoIngredients;
+    private FittingMultiLineTextWidget textNoSelection;
 
     private EditBox searchBar;
 
@@ -70,9 +68,8 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
 
     public KitchenScreen(KitchenMenu menu, Inventory playerInventory, Component displayName) {
         super(menu, playerInventory, displayName);
-        LOGGER.warn("image: {} {} bare {} {} pos {} {}", imageWidth, imageHeight, height, width, leftPos, topPos);
-        this.imageHeight = 183;
-        this.imageWidth = 175;
+        this.imageHeight = 184;
+        this.imageWidth = 176;
     }
 
     @Override
@@ -80,25 +77,26 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
         super.init();
 
         btnPrevRecipe = Button.builder(ARROW_PREV, it -> menu.nextRecipe(-1))
-                .pos(width / 2 - 79, height / 2 - 51).size(13, 20).build();
+                .pos(leftPos + 9, topPos + 44).size(13, 24).build();
         addRenderableWidget(btnPrevRecipe);
 
         btnNextRecipe = Button.builder(ARROW_NEXT, it -> menu.nextRecipe(1))
-                .pos(width / 2 - 9, height / 2 - 51).size(13, 20).build();
+                .pos(leftPos + 78, topPos + 44).size(13, 24).build();
         addRenderableWidget(btnNextRecipe);
 
         searchBar = new EditBox(minecraft.font, leftPos + 97, topPos + 5, 72, 10, Component.literal(""));
+        searchBar.setResponder(s -> menu.search(s));
         addRenderableWidget(searchBar);
 
-        textNoSelection = new MultiLineTextWidget(leftPos + 10, topPos + 20, NO_SELECTION, minecraft.font).setCentered(true);
+        textNoSelection = new FittingMultiLineTextWidget(leftPos + 10, topPos + 20, 80, 73, NO_SELECTION, minecraft.font);
         addRenderableWidget(textNoSelection);
 
-        textNoIngredients = new MultiLineTextWidget(leftPos + 100, topPos + 20, NO_INGREDIENTS, minecraft.font).setCentered(true);
+        textNoIngredients = new FittingMultiLineTextWidget(leftPos + 100, topPos + 20, 66, 73, NO_INGREDIENTS, minecraft.font);
         addRenderableWidget(textNoIngredients);
 
         int yOffset = 10;
         for (final var sortButton : CookingForBlockheadsRegistry.getSortButtons()) {
-            SortButton button = new SortButton(leftPos + imageWidth, topPos + yOffset, sortButton, it -> {
+            SortButton button = new SortButton(leftPos + imageWidth - 1, topPos + yOffset, sortButton, it -> {
                 menu.setSortComparator(sortButton.getComparator(Minecraft.getInstance().player));
             });
             addRenderableWidget(button);
@@ -106,19 +104,11 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
 
             yOffset += 20;
         }
-
-        recalculateScrollBar();
     }
 
     @Override
     protected void setInitialFocus() {
         super.setInitialFocus(this.searchBar);
-    }
-
-    @Override
-    public void afterKeyboardAction() {
-        LOGGER.info("afterKeyboardAction");
-        menu.search(searchBar.getValue());
     }
 
     @Override
@@ -157,20 +147,8 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         LOGGER.warn("mouseClicked: {} {} {}", mouseX, mouseY, button);
-        if (button == 1 && mouseX >= searchBar.getX() && mouseX < searchBar.getX() + searchBar.getWidth() && mouseY >= searchBar.getY() && mouseY < searchBar.getY() + searchBar.getHeight()) {
-            searchBar.setValue("");
-            menu.search(null);
-            menu.updateCraftableSlots();
-            setCurrentOffset(currentOffset);
-            return true;
-        } else {
-            if (searchBar.mouseClicked(mouseX, mouseY, button)) {
-                setFocused(searchBar);
-                return true;
-            }
-        }
 
-        if (mouseX >= scrollBarXPos && mouseX <= scrollBarXPos + SCROLLBAR_WIDTH && mouseY >= scrollBarYPos && mouseY <= scrollBarYPos + scrollBarScaledHeight) {
+        if (mouseX >= SCROLLBAR_X1 && mouseX <= SCROLLBAR_X2 && mouseY >= scrollBarYPos && mouseY <= scrollBarYPos + scrollBarScaledHeight) {
             mouseClickY = mouseY;
             indexWhenClicked = currentOffset;
         }
@@ -194,11 +172,6 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
-    // @Override
-    // protected void renderMenuBackground(GuiGraphics guiGraphics) {
-    //     LOGGER.info("renderMenuBackground");
-    // }
-
     @Override
     protected void renderBg(GuiGraphics guiGraphics, float partialTicks, int mouseX, int mouseY) {
         guiGraphics.blit(guiTexture, leftPos, topPos, 0, 0, imageWidth, imageHeight);
@@ -220,9 +193,11 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
         final var selection = menu.getSelectedRecipe();
         textNoSelection.visible = selection == null;
 
-        // Primary Screen components
         super.render(guiGraphics, mouseX, mouseY, partialTicks);
 
+        // Add our parts
+        renderScrollbar(guiGraphics);
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
         if (selection != null) {
             if (selection.recipe(Minecraft.getInstance().player).value().getType() == RecipeType.SMELTING) {
                 guiGraphics.blit(guiTexture, leftPos + 23, topPos + 29, 54, 184, 54, 54);
@@ -232,18 +207,25 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
 
             for (CraftMatrixFakeSlot slot : menu.getMatrixSlots()) {
                 if (slot.isLocked() && slot.getVisibleStacks().size() > 1) {
-                    // guiGraphics.blit(guiTexture, leftPos + slot.x, topPos + slot.y, 176, 60, 16, 16);
+                    guiGraphics.blit(guiTexture, leftPos + slot.x, topPos + slot.y, 176, 60, 16, 16);
                 }
             }
         }
 
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
         if (!hasRecipes) {
+            RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
             guiGraphics.fill(leftPos + 97, topPos + 17, leftPos + 168, topPos + 95, 0xAA222222);
         }
+    }
 
+    private void renderScrollbar(GuiGraphics guiGraphics) {
         // TODO Calculate correctly.
-        guiGraphics.fill(scrollBarXPos, scrollBarYPos, scrollBarXPos + SCROLLBAR_WIDTH, scrollBarYPos + scrollBarScaledHeight, SCROLLBAR_COLOR);
+        int listingRows = 1 + (menu.getItemListCount() / 3);
+        float visiblePct = Math.min(1f, VISIBLE_ROWS / (float)listingRows);
+        int scrollBarTop = SCROLLBAR_Y1 + (int) (currentOffset / (float)listingRows * SCROLLBAR_HEIGHT);
+        int scrollBarBottom = scrollBarTop + Math.max(1, (int) (visiblePct * SCROLLBAR_HEIGHT));
+
+        guiGraphics.fill(leftPos + SCROLLBAR_X1, topPos + scrollBarTop, leftPos + SCROLLBAR_X2, topPos + scrollBarBottom, SCROLLBAR_COLOR);
     }
 
     @Override
@@ -293,20 +275,10 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
     //     this.renderTooltip(guiGraphics, mouseX, mouseY);
     // }
 
-    private void recalculateScrollBar() {
-        int scrollBarTotalHeight = SCROLLBAR_HEIGHT - 1;
-        this.scrollBarScaledHeight = (int) (scrollBarTotalHeight * Math.min(1f, ((float) VISIBLE_ROWS / (Math.ceil(menu.getItemListCount() / (float) VISIBLE_COLS)))));
-        this.scrollBarXPos = leftPos + imageWidth - SCROLLBAR_WIDTH - 9;
-        this.scrollBarYPos = topPos + SCROLLBAR_Y + ((scrollBarTotalHeight - scrollBarScaledHeight) * currentOffset / Math.max(1,
-                (int) Math.ceil((menu.getItemListCount() / (float) VISIBLE_COLS)) - VISIBLE_ROWS));
-    }
-
     private void setCurrentOffset(int currentOffset) {
         this.currentOffset = Math.max(0, Math.min(currentOffset, (int) Math.ceil(menu.getItemListCount() / (float) VISIBLE_COLS) - VISIBLE_ROWS));
 
         menu.setScrollOffset(this.currentOffset);
-
-        recalculateScrollBar();
     }
 
     public List<Button> getSortingButtons() {

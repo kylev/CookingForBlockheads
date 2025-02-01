@@ -21,6 +21,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.inventory.NonInteractiveResultSlot;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -36,6 +37,14 @@ import java.util.*;
 public class KitchenMenu extends AbstractContainerMenu {
 
     private static final org.slf4j.Logger LOGGER = LogUtils.getLogger();
+    private static final int INVENTORY_X = 8;
+    private static final int CRAFT_MATRIX_ROWS = 3;
+    private static final int CRAFT_MATRIX_COLS = 3;
+    private static final int CRAFT_MATRIX_SIZE = CRAFT_MATRIX_COLS * CRAFT_MATRIX_ROWS;
+
+    private static final int CRAFTABLE_LISTING_COLS = 3;
+    private static final int CRAFTABLE_LISTING_ROWS = 4;
+    private static final int CRAFTABLE_LISTING_SIZE = CRAFTABLE_LISTING_COLS * CRAFTABLE_LISTING_ROWS;
 
     private final Player player;
     private final KitchenImpl kitchen;
@@ -67,18 +76,18 @@ public class KitchenMenu extends AbstractContainerMenu {
         this.player = player;
         this.kitchen = kitchen;
 
-        final var fakeInventory = new DefaultContainer(4 * 3 + 3 * 3);
+        final var fakeInventory = new DefaultContainer(CRAFTABLE_LISTING_SIZE + CRAFT_MATRIX_SIZE);
 
-        for (int i = 0; i < 4; i++) {
-            for (int j = 0; j < 3; j++) {
+        for (int i = 0; i < CRAFTABLE_LISTING_ROWS; i++) {
+            for (int j = 0; j < CRAFTABLE_LISTING_COLS; j++) {
                 final var slot = new CraftableListingFakeSlot(fakeInventory, j + i * 3, 102 + j * 18, 21 + i * 18);
                 recipeListingSlots.add(slot);
                 addSlot(slot);
             }
         }
 
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 3; j++) {
+        for (int i = 0; i < CRAFT_MATRIX_ROWS; i++) {
+            for (int j = 0; j < CRAFT_MATRIX_COLS; j++) {
                 final var slot = new CraftMatrixFakeSlot(fakeInventory, j + i * 3, 24 + j * 18, 30 + i * 18);
                 matrixSlots.add(slot);
                 addSlot(slot);
@@ -87,7 +96,7 @@ public class KitchenMenu extends AbstractContainerMenu {
 
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 9; j++) {
-                addSlot(new Slot(player.getInventory(), j + i * 9 + 9, 8 + j * 18, 102 + i * 18) {
+                addSlot(new Slot(player.getInventory(), j + i * 9 + 9, INVENTORY_X + j * 18, 102 + i * 18) {
                     @Override
                     public void setChanged() {
                         craftablesDirty = true;
@@ -98,7 +107,7 @@ public class KitchenMenu extends AbstractContainerMenu {
         }
 
         for (int i = 0; i < 9; i++) {
-            addSlot(new Slot(player.getInventory(), i, 8 + i * 18, 160) {
+            addSlot(new Slot(player.getInventory(), i, INVENTORY_X + i * 18, 160) {
                 @Override
                 public void setChanged() {
                     craftablesDirty = true;
@@ -136,6 +145,7 @@ public class KitchenMenu extends AbstractContainerMenu {
 
     @Override
     public void broadcastChanges() {
+        // LOGGER.info("broadcastChanges");
         super.broadcastChanges();
 
         if (craftablesDirty) {
@@ -158,6 +168,7 @@ public class KitchenMenu extends AbstractContainerMenu {
 
     @Override
     public void slotsChanged(Container inventory) {
+        LOGGER.info("Slots changes");
         // NOP, we don't want detectAndSendChanges called here, otherwise it will spam on crafting a stack of items
     }
 
