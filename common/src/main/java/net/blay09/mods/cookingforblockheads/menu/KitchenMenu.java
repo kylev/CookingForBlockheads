@@ -1,5 +1,6 @@
 package net.blay09.mods.cookingforblockheads.menu;
 
+import com.mojang.logging.LogUtils;
 import net.blay09.mods.balm.api.Balm;
 import net.blay09.mods.balm.api.container.DefaultContainer;
 import net.blay09.mods.cookingforblockheads.CookingForBlockheads;
@@ -33,6 +34,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 
 public class KitchenMenu extends AbstractContainerMenu {
+
+    private static final org.slf4j.Logger LOGGER = LogUtils.getLogger();
 
     private final Player player;
     private final KitchenImpl kitchen;
@@ -68,7 +71,7 @@ public class KitchenMenu extends AbstractContainerMenu {
 
         for (int i = 0; i < 4; i++) {
             for (int j = 0; j < 3; j++) {
-                final var slot = new CraftableListingFakeSlot(fakeInventory, j + i * 3, 102 + j * 18, 11 + i * 18);
+                final var slot = new CraftableListingFakeSlot(fakeInventory, j + i * 3, 102 + j * 18, 21 + i * 18);
                 recipeListingSlots.add(slot);
                 addSlot(slot);
             }
@@ -76,7 +79,7 @@ public class KitchenMenu extends AbstractContainerMenu {
 
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
-                final var slot = new CraftMatrixFakeSlot(fakeInventory, j + i * 3, 24 + j * 18, 20 + i * 18);
+                final var slot = new CraftMatrixFakeSlot(fakeInventory, j + i * 3, 24 + j * 18, 30 + i * 18);
                 matrixSlots.add(slot);
                 addSlot(slot);
             }
@@ -84,7 +87,7 @@ public class KitchenMenu extends AbstractContainerMenu {
 
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 9; j++) {
-                addSlot(new Slot(player.getInventory(), j + i * 9 + 9, 8 + j * 18, 92 + i * 18) {
+                addSlot(new Slot(player.getInventory(), j + i * 9 + 9, 8 + j * 18, 102 + i * 18) {
                     @Override
                     public void setChanged() {
                         craftablesDirty = true;
@@ -95,7 +98,7 @@ public class KitchenMenu extends AbstractContainerMenu {
         }
 
         for (int i = 0; i < 9; i++) {
-            addSlot(new Slot(player.getInventory(), i, 8 + i * 18, 150) {
+            addSlot(new Slot(player.getInventory(), i, 8 + i * 18, 160) {
                 @Override
                 public void setChanged() {
                     craftablesDirty = true;
@@ -107,6 +110,7 @@ public class KitchenMenu extends AbstractContainerMenu {
 
     @Override
     public void clicked(int slotNumber, int dragType, ClickType clickType, Player player) {
+        LOGGER.debug("clicked: slotNumber={}, dragType={}, clickType={}", slotNumber, dragType, clickType);
         var handled = false;
         if (slotNumber >= 0 && slotNumber < slots.size()) {
             Slot slot = slots.get(slotNumber);

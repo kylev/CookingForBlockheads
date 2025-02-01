@@ -1,6 +1,7 @@
 package net.blay09.mods.cookingforblockheads.client.gui.screen;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.logging.LogUtils;
 import net.blay09.mods.balm.mixin.AbstractContainerScreenAccessor;
 import net.blay09.mods.cookingforblockheads.CookingForBlockheads;
 import net.blay09.mods.cookingforblockheads.CookingForBlockheadsConfig;
@@ -16,6 +17,8 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.MultiLineTextWidget;
+import net.minecraft.client.gui.components.StringWidget;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
@@ -40,6 +43,13 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
     private static final int VISIBLE_ROWS = 4;
     private static final int VISIBLE_COLS = 3;
 
+    private static final Component ARROW_PREV = Component.literal("<");
+    private static final Component ARROW_NEXT = Component.literal(">");
+    private static final Component NO_INGREDIENTS = Component.translatable("gui.cookingforblockheads.no_ingredients");
+    private static final Component NO_SELECTION = Component.translatable("gui.cookingforblockheads.no_selection");
+
+    private static final org.slf4j.Logger LOGGER = LogUtils.getLogger();
+
     private int scrollBarScaledHeight;
     private int scrollBarXPos;
     private int scrollBarYPos;
@@ -51,44 +61,44 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
 
     private Button btnNextRecipe;
     private Button btnPrevRecipe;
+    private MultiLineTextWidget textNoIngredients;
+    private MultiLineTextWidget textNoSelection;
 
     private EditBox searchBar;
 
     private final List<SortButton> sortButtons = new ArrayList<>();
 
-    private final String[] noIngredients;
-    private final String[] noSelection;
-
     public KitchenScreen(KitchenMenu menu, Inventory playerInventory, Component displayName) {
         super(menu, playerInventory, displayName);
-
-        noIngredients = I18n.get("gui.cookingforblockheads.no_ingredients").split("\\\\n");
-        noSelection = I18n.get("gui.cookingforblockheads.no_selection").split("\\\\n");
+        LOGGER.warn("image: {} {} bare {} {} pos {} {}", imageWidth, imageHeight, height, width, leftPos, topPos);
+        this.imageHeight = 183;
+        this.imageWidth = 175;
     }
 
     @Override
     protected void init() {
-        imageHeight = 174;
         super.init();
 
-        btnPrevRecipe = Button.builder(Component.literal("<"), it -> menu.nextRecipe(-1))
+        btnPrevRecipe = Button.builder(ARROW_PREV, it -> menu.nextRecipe(-1))
                 .pos(width / 2 - 79, height / 2 - 51).size(13, 20).build();
-        btnPrevRecipe.visible = false;
         addRenderableWidget(btnPrevRecipe);
 
-        btnNextRecipe = Button.builder(Component.literal(">"), it -> menu.nextRecipe(1))
+        btnNextRecipe = Button.builder(ARROW_NEXT, it -> menu.nextRecipe(1))
                 .pos(width / 2 - 9, height / 2 - 51).size(13, 20).build();
-        btnNextRecipe.visible = false;
         addRenderableWidget(btnNextRecipe);
 
-        searchBar = new EditBox(minecraft.font, leftPos + imageWidth - 78, topPos - 5, 70, 10, searchBar, Component.empty());
-        setInitialFocus(searchBar);
+        searchBar = new EditBox(minecraft.font, leftPos + 97, topPos + 5, 72, 10, Component.literal(""));
         addRenderableWidget(searchBar);
 
-        int yOffset = -80;
+        textNoSelection = new MultiLineTextWidget(leftPos + 10, topPos + 20, NO_SELECTION, minecraft.font).setCentered(true);
+        addRenderableWidget(textNoSelection);
 
+        textNoIngredients = new MultiLineTextWidget(leftPos + 100, topPos + 20, NO_INGREDIENTS, minecraft.font).setCentered(true);
+        addRenderableWidget(textNoIngredients);
+
+        int yOffset = 10;
         for (final var sortButton : CookingForBlockheadsRegistry.getSortButtons()) {
-            SortButton button = new SortButton(width / 2 + 87, height / 2 + yOffset, sortButton, it -> {
+            SortButton button = new SortButton(leftPos + imageWidth, topPos + yOffset, sortButton, it -> {
                 menu.setSortComparator(sortButton.getComparator(Minecraft.getInstance().player));
             });
             addRenderableWidget(button);
@@ -101,7 +111,19 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
     }
 
     @Override
+    protected void setInitialFocus() {
+        super.setInitialFocus(this.searchBar);
+    }
+
+    @Override
+    public void afterKeyboardAction() {
+        LOGGER.info("afterKeyboardAction");
+        menu.search(searchBar.getValue());
+    }
+
+    @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
+        LOGGER.warn("mouseScrolled: {} {} {} {}", mouseX, mouseY, deltaX, deltaY);
         if (deltaY == 0) {
             return false;
         }
@@ -134,6 +156,7 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        LOGGER.warn("mouseClicked: {} {} {}", mouseX, mouseY, button);
         if (button == 1 && mouseX >= searchBar.getX() && mouseX < searchBar.getX() + searchBar.getWidth() && mouseY >= searchBar.getY() && mouseY < searchBar.getY() + searchBar.getHeight()) {
             searchBar.setValue("");
             menu.search(null);
@@ -171,101 +194,56 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
-    @Override
-    public boolean charTyped(char c, int keyCode) {
-        boolean result = super.charTyped(c, keyCode);
-
-        menu.search(searchBar.getValue());
-        menu.updateCraftableSlots();
-        setCurrentOffset(currentOffset);
-
-        return result;
-    }
-
-    @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-            minecraft.player.closeContainer();
-            return true;
-        }
-
-        if (searchBar.keyPressed(keyCode, scanCode, modifiers) || searchBar.isFocused()) {
-            menu.search(searchBar.getValue());
-            menu.updateCraftableSlots();
-            setCurrentOffset(currentOffset);
-            return true;
-        }
-
-        return super.keyPressed(keyCode, scanCode, modifiers);
-    }
+    // @Override
+    // protected void renderMenuBackground(GuiGraphics guiGraphics) {
+    //     LOGGER.info("renderMenuBackground");
+    // }
 
     @Override
     protected void renderBg(GuiGraphics guiGraphics, float partialTicks, int mouseX, int mouseY) {
-        if (menu.isScrollOffsetDirty()) {
-            setCurrentOffset(currentOffset);
-            menu.setScrollOffsetDirty(false);
-        }
+        guiGraphics.blit(guiTexture, leftPos, topPos, 0, 0, imageWidth, imageHeight);
+    }
 
-        guiGraphics.setColor(1f, 1f, 1f, 1f);
-        guiGraphics.blit(guiTexture, leftPos, topPos - 10, 0, 0, imageWidth, imageHeight + 10);
-
-        if (mouseClickY != -1) {
-            float pixelsPerFilter = (SCROLLBAR_HEIGHT - scrollBarScaledHeight) / (float) Math.max(1,
-                    (int) Math.ceil(menu.getItemListCount() / (float) VISIBLE_COLS) - VISIBLE_ROWS);
-            if (pixelsPerFilter != 0) {
-                int numberOfFiltersMoved = (int) ((mouseY - mouseClickY) / pixelsPerFilter);
-                if (numberOfFiltersMoved != lastNumberOfMoves) {
-                    setCurrentOffset(indexWhenClicked + numberOfFiltersMoved);
-                    lastNumberOfMoves = numberOfFiltersMoved;
-                }
-            }
-        }
-
+    @Override
+    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
         btnPrevRecipe.visible = menu.selectionHasRecipeVariants();
         btnPrevRecipe.active = menu.selectionHasPreviousRecipe();
         btnNextRecipe.visible = menu.selectionHasRecipeVariants();
         btnNextRecipe.active = menu.selectionHasNextRecipe();
 
         boolean hasRecipes = menu.getItemListCount() > 0;
-
+        textNoIngredients.visible = !hasRecipes;
         for (Button sortButton : sortButtons) {
             sortButton.active = hasRecipes;
         }
 
-        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-
-        Font font = minecraft.font;
         final var selection = menu.getSelectedRecipe();
-        if (selection == null) {
-            int curY = topPos + 79 / 2 - noSelection.length / 2 * font.lineHeight;
-            for (String s : noSelection) {
-                guiGraphics.drawString(font, s, leftPos + 23 + 27 - font.width(s) / 2, curY, 0xFFFFFFFF, true);
-                curY += font.lineHeight + 5;
-            }
-        } else if (selection.recipe(Minecraft.getInstance().player).value().getType() == RecipeType.SMELTING) {
-            guiGraphics.blit(guiTexture, leftPos + 23, topPos + 19, 54, 184, 54, 54);
-        } else {
-            guiGraphics.blit(guiTexture, leftPos + 23, topPos + 19, 0, 184, 54, 54);
-        }
+        textNoSelection.visible = selection == null;
+
+        // Primary Screen components
+        super.render(guiGraphics, mouseX, mouseY, partialTicks);
 
         if (selection != null) {
+            if (selection.recipe(Minecraft.getInstance().player).value().getType() == RecipeType.SMELTING) {
+                guiGraphics.blit(guiTexture, leftPos + 23, topPos + 29, 54, 184, 54, 54);
+            } else {
+                guiGraphics.blit(guiTexture, leftPos + 23, topPos + 29, 0, 184, 54, 54);
+            }
+
             for (CraftMatrixFakeSlot slot : menu.getMatrixSlots()) {
                 if (slot.isLocked() && slot.getVisibleStacks().size() > 1) {
-                    guiGraphics.blit(guiTexture, leftPos + slot.x, topPos + slot.y, 176, 60, 16, 16);
+                    // guiGraphics.blit(guiTexture, leftPos + slot.x, topPos + slot.y, 176, 60, 16, 16);
                 }
             }
         }
 
-        guiGraphics.fill(scrollBarXPos, scrollBarYPos, scrollBarXPos + SCROLLBAR_WIDTH, scrollBarYPos + scrollBarScaledHeight, SCROLLBAR_COLOR);
-
-        if (menu.getItemListCount() == 0) {
-            guiGraphics.fill(leftPos + 97, topPos + 7, leftPos + 168, topPos + 85, 0xAA222222);
-            int curY = topPos + 79 / 2 - noIngredients.length / 2 * font.lineHeight;
-            for (String s : noIngredients) {
-                guiGraphics.drawString(font, s, leftPos + 97 + 36 - font.width(s) / 2, curY, 0xFFFFFFFF, true);
-                curY += font.lineHeight + 5;
-            }
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        if (!hasRecipes) {
+            guiGraphics.fill(leftPos + 97, topPos + 17, leftPos + 168, topPos + 95, 0xAA222222);
         }
+
+        // TODO Calculate correctly.
+        guiGraphics.fill(scrollBarXPos, scrollBarYPos, scrollBarXPos + SCROLLBAR_WIDTH, scrollBarYPos + scrollBarScaledHeight, SCROLLBAR_COLOR);
     }
 
     @Override
@@ -292,28 +270,28 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
         }
     }
 
-    @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
-        super.render(guiGraphics, mouseX, mouseY, partialTicks);
+    // @Override
+    // public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
+    //     super.render(guiGraphics, mouseX, mouseY, partialTicks);
 
-        var poseStack = guiGraphics.pose();
-        poseStack.pushPose();
-        poseStack.translate(0, 0, 300);
-        for (Slot slot : menu.slots) {
-            if (slot instanceof CraftMatrixFakeSlot fakeSlot) {
-                if (fakeSlot.isMissing() && !slot.getItem().isEmpty()) {
-                    guiGraphics.fillGradient(leftPos + slot.x, topPos + slot.y, leftPos + slot.x + 16, topPos + slot.y + 16, 0x77FF4444, 0x77FF5555);
-                }
-            }
-        }
-        poseStack.popPose();
+    //     var poseStack = guiGraphics.pose();
+    //     poseStack.pushPose();
+    //     poseStack.translate(0, 0, 300);
+    //     for (Slot slot : menu.slots) {
+    //         if (slot instanceof CraftMatrixFakeSlot fakeSlot) {
+    //             if (fakeSlot.isMissing() && !slot.getItem().isEmpty()) {
+    //                 guiGraphics.fillGradient(leftPos + slot.x, topPos + slot.y, leftPos + slot.x + 16, topPos + slot.y + 16, 0x77FF4444, 0x77FF5555);
+    //             }
+    //         }
+    //     }
+    //     poseStack.popPose();
 
-        for (CraftMatrixFakeSlot matrixSlot : menu.getMatrixSlots()) {
-            matrixSlot.updateSlot(partialTicks);
-        }
+    //     for (CraftMatrixFakeSlot matrixSlot : menu.getMatrixSlots()) {
+    //         matrixSlot.updateSlot(partialTicks);
+    //     }
 
-        this.renderTooltip(guiGraphics, mouseX, mouseY);
-    }
+    //     this.renderTooltip(guiGraphics, mouseX, mouseY);
+    // }
 
     private void recalculateScrollBar() {
         int scrollBarTotalHeight = SCROLLBAR_HEIGHT - 1;
