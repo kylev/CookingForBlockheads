@@ -5,6 +5,7 @@ import com.mojang.logging.LogUtils;
 import net.blay09.mods.balm.mixin.AbstractContainerScreenAccessor;
 import net.blay09.mods.cookingforblockheads.CookingForBlockheads;
 import net.blay09.mods.cookingforblockheads.CookingForBlockheadsConfig;
+import net.blay09.mods.cookingforblockheads.client.gui.CraftableScroller;
 import net.blay09.mods.cookingforblockheads.client.gui.SortButton;
 import net.blay09.mods.cookingforblockheads.crafting.RecipeWithStatus;
 import net.blay09.mods.cookingforblockheads.menu.KitchenMenu;
@@ -61,6 +62,7 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
     private Button btnPrevRecipe;
     private FittingMultiLineTextWidget textNoIngredients;
     private FittingMultiLineTextWidget textNoSelection;
+    private CraftableScroller craftableScroller;
 
     private EditBox searchBar;
 
@@ -94,6 +96,9 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
         textNoIngredients = new FittingMultiLineTextWidget(leftPos + 100, topPos + 20, 66, 73, NO_INGREDIENTS, minecraft.font);
         addRenderableWidget(textNoIngredients);
 
+        craftableScroller = new CraftableScroller(leftPos + 98, topPos + 18, 62, 77, Component.literal(""));
+        addRenderableOnly(craftableScroller);
+
         int yOffset = 10;
         for (final var sortButton : CookingForBlockheadsRegistry.getSortButtons()) {
             SortButton button = new SortButton(leftPos + imageWidth - 1, topPos + yOffset, sortButton, it -> {
@@ -114,63 +119,66 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
         LOGGER.warn("mouseScrolled: {} {} {} {}", mouseX, mouseY, deltaX, deltaY);
-        if (deltaY == 0) {
-            return false;
-        }
+    //     if (deltaY == 0) {
+    //         return false;
+    //     }
 
-        if (menu.getSelectedRecipe() != null && mouseX >= leftPos + 24 && mouseY >= topPos + 20 && mouseX < leftPos + 78 && mouseY < topPos + 74) {
-            Slot slot = ((AbstractContainerScreenAccessor) this).getHoveredSlot();
-            if (slot instanceof CraftMatrixFakeSlot fakeSlot && fakeSlot.getVisibleStacks().size() > 1) {
-                final var lockedInput = fakeSlot.scrollDisplayListAndLock(deltaY > 0 ? -1 : 1);
-                menu.setLockedInput(fakeSlot.getIngredientIndex(), lockedInput);
-            }
-        } else {
-            setCurrentOffset(deltaY > 0 ? currentOffset - 1 : currentOffset + 1);
-        }
-
-        return true;
-    }
-
-    @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int state) {
-        boolean result = super.mouseReleased(mouseX, mouseY, state);
-
-        if (state != -1 && mouseClickY != -1) {
-            mouseClickY = -1;
-            indexWhenClicked = 0;
-            lastNumberOfMoves = 0;
-        }
-
-        return result;
-    }
-
-    @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        LOGGER.warn("mouseClicked: {} {} {}", mouseX, mouseY, button);
-
-        if (mouseX >= SCROLLBAR_X1 && mouseX <= SCROLLBAR_X2 && mouseY >= scrollBarYPos && mouseY <= scrollBarYPos + scrollBarScaledHeight) {
-            mouseClickY = mouseY;
-            indexWhenClicked = currentOffset;
-        }
-
-        Slot mouseSlot = ((AbstractContainerScreenAccessor) this).getHoveredSlot();
-        if (mouseSlot instanceof CraftMatrixFakeSlot fakeSlot) {
-            if (button == 0) {
-                ItemStack itemStack = mouseSlot.getItem();
-                RecipeWithStatus recipe = menu.findRecipeForResultItem(itemStack);
-                if (recipe != null) {
-                    menu.selectCraftable(recipe);
-                    setCurrentOffset(menu.getRecipesForSelectionIndex());
-                }
-            } else if (button == 1) {
-                final var lockedInput = fakeSlot.toggleLock();
-                menu.setLockedInput(fakeSlot.getIngredientIndex(), lockedInput);
-            }
+    //     if (menu.getSelectedRecipe() != null && mouseX >= leftPos + 24 && mouseY >= topPos + 20 && mouseX < leftPos + 78 && mouseY < topPos + 74) {
+    //         Slot slot = ((AbstractContainerScreenAccessor) this).getHoveredSlot();
+    //         if (slot instanceof CraftMatrixFakeSlot fakeSlot && fakeSlot.getVisibleStacks().size() > 1) {
+    //             final var lockedInput = fakeSlot.scrollDisplayListAndLock(deltaY > 0 ? -1 : 1);
+    //             menu.setLockedInput(fakeSlot.getIngredientIndex(), lockedInput);
+    //         }
+    //     } else {
+        //     }
+        if (craftableScroller.mouseScrolled(mouseX, mouseY, deltaX, deltaY)) {
             return true;
         }
+        setCurrentOffset(deltaY > 0 ? currentOffset - 1 : currentOffset + 1);
 
-        return super.mouseClicked(mouseX, mouseY, button);
+        return super.mouseScrolled(mouseX, mouseY, deltaX, deltaY);
     }
+
+    // @Override
+    // public boolean mouseReleased(double mouseX, double mouseY, int state) {
+    //     boolean result = super.mouseReleased(mouseX, mouseY, state);
+
+    //     if (state != -1 && mouseClickY != -1) {
+    //         mouseClickY = -1;
+    //         indexWhenClicked = 0;
+    //         lastNumberOfMoves = 0;
+    //     }
+
+    //     return result;
+    // }
+
+    // @Override
+    // public boolean mouseClicked(double mouseX, double mouseY, int button) {
+    //     LOGGER.warn("mouseClicked: {} {} {}", mouseX, mouseY, button);
+
+    //     if (mouseX >= SCROLLBAR_X1 && mouseX <= SCROLLBAR_X2 && mouseY >= scrollBarYPos && mouseY <= scrollBarYPos + scrollBarScaledHeight) {
+    //         mouseClickY = mouseY;
+    //         indexWhenClicked = currentOffset;
+    //     }
+
+    //     Slot mouseSlot = ((AbstractContainerScreenAccessor) this).getHoveredSlot();
+    //     if (mouseSlot instanceof CraftMatrixFakeSlot fakeSlot) {
+    //         if (button == 0) {
+    //             ItemStack itemStack = mouseSlot.getItem();
+    //             RecipeWithStatus recipe = menu.findRecipeForResultItem(itemStack);
+    //             if (recipe != null) {
+    //                 menu.selectCraftable(recipe);
+    //                 // setCurrentOffset(menu.getRecipesForSelectionIndex());
+    //             }
+    //         } else if (button == 1) {
+    //             final var lockedInput = fakeSlot.toggleLock();
+    //             menu.setLockedInput(fakeSlot.getIngredientIndex(), lockedInput);
+    //         }
+    //         return true;
+    //     }
+
+    //     return super.mouseClicked(mouseX, mouseY, button);
+    // }
 
     @Override
     protected void renderBg(GuiGraphics guiGraphics, float partialTicks, int mouseX, int mouseY) {
@@ -196,7 +204,7 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
         super.render(guiGraphics, mouseX, mouseY, partialTicks);
 
         // Add our parts
-        renderScrollbar(guiGraphics);
+        // renderScrollbar(guiGraphics);
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
         if (selection != null) {
             if (selection.recipe(Minecraft.getInstance().player).value().getType() == RecipeType.SMELTING) {
@@ -251,29 +259,6 @@ public class KitchenScreen extends AbstractContainerScreen<KitchenMenu> {
             poseStack.popPose();
         }
     }
-
-    // @Override
-    // public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks) {
-    //     super.render(guiGraphics, mouseX, mouseY, partialTicks);
-
-    //     var poseStack = guiGraphics.pose();
-    //     poseStack.pushPose();
-    //     poseStack.translate(0, 0, 300);
-    //     for (Slot slot : menu.slots) {
-    //         if (slot instanceof CraftMatrixFakeSlot fakeSlot) {
-    //             if (fakeSlot.isMissing() && !slot.getItem().isEmpty()) {
-    //                 guiGraphics.fillGradient(leftPos + slot.x, topPos + slot.y, leftPos + slot.x + 16, topPos + slot.y + 16, 0x77FF4444, 0x77FF5555);
-    //             }
-    //         }
-    //     }
-    //     poseStack.popPose();
-
-    //     for (CraftMatrixFakeSlot matrixSlot : menu.getMatrixSlots()) {
-    //         matrixSlot.updateSlot(partialTicks);
-    //     }
-
-    //     this.renderTooltip(guiGraphics, mouseX, mouseY);
-    // }
 
     private void setCurrentOffset(int currentOffset) {
         this.currentOffset = Math.max(0, Math.min(currentOffset, (int) Math.ceil(menu.getItemListCount() / (float) VISIBLE_COLS) - VISIBLE_ROWS));
